@@ -1,8 +1,10 @@
 package main
 
 import (
-	gl "github.com/go-gl/gl/v2.1/gl"
+	"fmt"
+	"github.com/go-gl/gl/v2.1/gl"
 	glut "github.com/vbsw/freeglut"
+	"lab/figures"
 	"math"
 )
 
@@ -12,9 +14,6 @@ const (
 	WindowTitle      = "Laboratory Report 3"
 	RotationStep     = 5.0
 	MouseSensitivity = 0.5
-	InitialFOV       = 45.0
-	PerspectiveNear  = 1.0
-	PerspectiveFar   = 100.0
 	MovementSpeed    = 0.1
 )
 
@@ -31,67 +30,54 @@ var (
 	aPressed               bool
 	sPressed               bool
 	dPressed               bool
+	brick                  *figures.Brick
+	cube                   *figures.Cube
 )
-
-func drawCube() {
-	gl.Begin(gl.QUADS)
-
-	// Лицевая грань
-	gl.Color3f(1.0, 0.0, 0.0)
-	gl.Vertex3f(-1.0, -1.0, 1.0)
-	gl.Vertex3f(1.0, -1.0, 1.0)
-	gl.Vertex3f(1.0, 1.0, 1.0)
-	gl.Vertex3f(-1.0, 1.0, 1.0)
-
-	// Задняя грань
-	gl.Color3f(0.0, 1.0, 0.0)
-	gl.Vertex3f(-1.0, -1.0, -1.0)
-	gl.Vertex3f(-1.0, 1.0, -1.0)
-	gl.Vertex3f(1.0, 1.0, -1.0)
-	gl.Vertex3f(1.0, -1.0, -1.0)
-
-	// Верхняя грань
-	gl.Color3f(0.0, 0.0, 1.0)
-	gl.Vertex3f(-1.0, 1.0, -1.0)
-	gl.Vertex3f(-1.0, 1.0, 1.0)
-	gl.Vertex3f(1.0, 1.0, 1.0)
-	gl.Vertex3f(1.0, 1.0, -1.0)
-
-	// Нижняя грань
-	gl.Color3f(1.0, 1.0, 0.0)
-	gl.Vertex3f(-1.0, -1.0, -1.0)
-	gl.Vertex3f(1.0, -1.0, -1.0)
-	gl.Vertex3f(1.0, -1.0, 1.0)
-	gl.Vertex3f(-1.0, -1.0, 1.0)
-
-	// Правая грань
-	gl.Color3f(1.0, 0.0, 1.0)
-	gl.Vertex3f(1.0, -1.0, -1.0)
-	gl.Vertex3f(1.0, 1.0, -1.0)
-	gl.Vertex3f(1.0, 1.0, 1.0)
-	gl.Vertex3f(1.0, -1.0, 1.0)
-
-	// Левая грань
-	gl.Color3f(0.0, 1.0, 1.0)
-	gl.Vertex3f(-1.0, -1.0, -1.0)
-	gl.Vertex3f(-1.0, -1.0, 1.0)
-	gl.Vertex3f(-1.0, 1.0, 1.0)
-	gl.Vertex3f(-1.0, 1.0, -1.0)
-	gl.End()
-}
 
 func display() {
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 	gl.LoadIdentity()
 
-	// Применяем преобразования камеры
 	gl.Translatef(xPos, yPos, zPos)
 	gl.Rotatef(angleX, 1.0, 0.0, 0.0)
 	gl.Rotatef(angleY, 0.0, 1.0, 0.0)
 	gl.Rotatef(angleZ, 0.0, 0.0, 1.0)
 
-	drawCube()
+	gl.PushMatrix()
+	gl.Translatef(-2.5, 0, 0)
+	cube.Draw()
+	gl.PopMatrix()
+
+	gl.PushMatrix()
+	gl.Translatef(2.5, 0, 0)
+	brick.Draw()
+	gl.PopMatrix()
+
 	glut.SwapBuffers()
+}
+
+func initGL() {
+	gl.Enable(gl.DEPTH_TEST)
+	gl.Enable(gl.LIGHTING)
+	gl.Enable(gl.NORMALIZE)
+	gl.Enable(gl.LIGHT1)
+	gl.Enable(gl.COLOR_MATERIAL)
+	gl.ColorMaterial(gl.FRONT_AND_BACK, gl.AMBIENT_AND_DIFFUSE)
+
+	lightAmbient := []float32{0.2, 0.2, 0.2, 1.0}
+	lightDiffuse := []float32{0.2, 0.2, 0.2, 1.0}
+	lightSpecular := []float32{1.0, 1.0, 1.0, 1.0}
+	gl.Lightfv(gl.LIGHT1, gl.AMBIENT, &lightAmbient[0])
+	gl.Lightfv(gl.LIGHT1, gl.DIFFUSE, &lightDiffuse[0])
+	gl.Lightfv(gl.LIGHT1, gl.SPECULAR, &lightSpecular[0])
+
+	// Настройки материала
+	materialSpecular := []float32{0.5, 0.5, 0.5, 1.0}
+	materialShininess := []float32{50.0}
+	gl.Materialfv(gl.FRONT, gl.SPECULAR, &materialSpecular[0])
+	gl.Materialfv(gl.FRONT, gl.SHININESS, &materialShininess[0])
+
+	gl.ClearColor(0.25, 0.25, 0.35, 1.0)
 }
 
 func reshape(width, height int) {
@@ -141,15 +127,6 @@ func motion(x, y int) {
 	}
 }
 
-func initGL() {
-	gl.Enable(gl.DEPTH_TEST)
-	gl.MatrixMode(gl.PROJECTION)
-	gl.LoadIdentity()
-	aspect := float32(glut.Get(glut.WINDOW_WIDTH)) / float32(glut.Get(glut.WINDOW_HEIGHT))
-	perspective(InitialFOV, aspect, PerspectiveNear, PerspectiveFar)
-	gl.MatrixMode(gl.MODELVIEW)
-}
-
 func perspective(fov, aspect, near, far float32) {
 	fovRad := fov * (math.Pi / 180.0)
 	tanHalfFov := float32(math.Tan(float64(fovRad / 2.0)))
@@ -164,7 +141,6 @@ func perspective(fov, aspect, near, far float32) {
 	)
 }
 
-// Добавляем обработчики клавиатуры
 func keyboard(key uint8, x, y int) {
 	switch key {
 	case 'w', 'W':
@@ -199,10 +175,10 @@ func update() {
 		zPos -= MovementSpeed
 	}
 	if aPressed {
-		xPos -= MovementSpeed
+		xPos += MovementSpeed
 	}
 	if dPressed {
-		xPos += MovementSpeed
+		xPos -= MovementSpeed
 	}
 	glut.PostRedisplay()
 }
@@ -221,8 +197,10 @@ func main() {
 	glut.InitWindowSize(WindowWidth, WindowHeight)
 	glut.CreateWindow(WindowTitle)
 
-	// Критически важная инициализация
 	if err := gl.Init(); err != nil {
+		if err := gl.GetError(); err != gl.NO_ERROR {
+			fmt.Println("OpenGL error:", err)
+		}
 		panic(err)
 	}
 
@@ -238,5 +216,36 @@ func main() {
 	glut.KeyboardUpFunc(keyboardUp)
 	glut.TimerFunc(0, timer, 0)
 
+	cube = figures.NewCube(2.0)
+	brick = figures.NewBrick(0.5)
+
 	glut.MainLoop()
 }
+
+// 6
+// gl.BindBuffer()
+// gl.BufferData()
+// gl.glUnmapBuffer()
+// gl.DrawArrays()
+// gl.DrawElements()
+// gl.Vertex()
+// gl.Color()
+// glu.Sphere
+// glu.Cylinder
+
+// 7
+// gl.MatrixMode: Выбирает матрицу для манипуляций (модель, проекция, текстура).
+// gl.LoadIdentity: Сбрасывает матрицу в единичную.
+// gl.LoadMatrixf: Загружает пользовательскую матрицу.
+// gl.MultMatrixf: Умножает текущую матрицу на заданную.
+// gl.Translatef: Перемещает матрицу.
+// gl.Rotatef: Вращает матрицу.
+// gl.Scalef: Масштабирует объект.
+
+// 8
+// Функции для работы с проекциями и областью вывода:
+// gl.Viewport: Устанавливает область вывода на экране.
+// gl.Ortho: Устанавливает ортогональную проекцию.
+// gluPerspective: Устанавливает перспективную проекцию (используется библиотека GLU)
+// gl.Frustum: Устанавливает обрезающую проекцию.
+// gluLookAt: Устанавливает точку зрения камеры (используется библиотека GLU)

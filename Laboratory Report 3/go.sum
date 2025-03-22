@@ -1,0 +1,4 @@
+github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 h1:5BVwOaUSBTlVZowGO6VZGw2H/zl9nrd3eCZfYV+NfQA=
+github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71/go.mod h1:9YTyiznxEY1fVinfM7RvRcjRHbw2xLBJ3AAGIT0I4Nw=
+github.com/vbsw/freeglut v0.1.0 h1:VzyN6MHiW1rGL4Sko4m5vK0WQeFPgXBgW7jQlcgKfXI=
+github.com/vbsw/freeglut v0.1.0/go.mod h1:07OcCHocd2zOk3HI+1MW5AOq9WkFFyzlbxS7G+3r+/0=
