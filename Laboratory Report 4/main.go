@@ -16,24 +16,25 @@ import (
 )
 
 type BitmapFileHeader struct {
-	Signature  [2]byte
-	FileSize   uint32
-	Reserved   uint32
-	DataOffset uint32
+	BfType      [2]byte
+	BfSize      uint32
+	BfReserved1 uint16
+	BfReserved2 uint16
+	BfOffBits   uint32
 }
 
 type BitmapInfoHeader struct {
-	Size            uint32
-	Width           int32
-	Height          int32
-	Planes          uint16
-	BitCount        uint16
-	Compression     uint32
-	ImageSize       uint32
-	XpixelsPerM     int32
-	YpixelsPerM     int32
-	ColorsUsed      uint32
-	ColorsImportant uint32
+	BiSize          uint32
+	BiWidth         int32
+	BiHeight        int32
+	BiPlanes        uint16
+	BiBitCount      uint16
+	BiCompression   uint32
+	BiSizeImage     uint32
+	BiXPelsPerMeter int32
+	BiYPelsPerMeter int32
+	BiClrUsed       uint32
+	BiClrImportant  uint32
 }
 
 func readHeaders(file *os.File) (*BitmapFileHeader, *BitmapInfoHeader, error) {
@@ -42,8 +43,8 @@ func readHeaders(file *os.File) (*BitmapFileHeader, *BitmapInfoHeader, error) {
 		return nil, nil, err
 	}
 
-	if string(fileHeader.Signature[:]) != "BM" {
-		return nil, nil, errors.New("not a BMP file")
+	if string(fileHeader.BfType[:]) != "BM" {
+		return nil, nil, errors.New("Файл соответствует формату BMP")
 	}
 
 	var infoHeader BitmapInfoHeader
@@ -66,18 +67,20 @@ func loadBMP(filename string) (image.Image, error) {
 		return nil, err
 	}
 
-	if infoHeader.Compression != 0 {
-		return nil, errors.New("compressed BMP files are not supported")
+	if infoHeader.BiCompression != 0 {
+		return nil, errors.New("BMP изображения с компрессией не поддерживаются")
 	}
 
 	var palette []color.RGBA
-	if infoHeader.BitCount <= 8 {
-		paletteSize := int(infoHeader.ColorsUsed)
+	if infoHeader.BiBitCount <= 8 {
+		paletteSize := int(infoHeader.BiClrUsed)
 		if paletteSize == 0 {
-			paletteSize = 1 << infoHeader.BitCount
+			paletteSize = 1 << infoHeader.BiBitCount
 		}
 
 		palette = make([]color.RGBA, paletteSize)
+		log.Printf("Индексированное изображение: %d бит, палитра из %d цветов", infoHeader.BiBitCount, len(palette))
+
 		for i := 0; i < paletteSize; i++ {
 			var entry struct {
 				B, G, R, A uint8
@@ -85,19 +88,21 @@ func loadBMP(filename string) (image.Image, error) {
 			if err := binary.Read(file, binary.LittleEndian, &entry); err != nil {
 				return nil, err
 			}
-			palette[i] = color.RGBA{entry.R, entry.G, entry.B, 255}
+			palette[i] = color.RGBA{R: entry.R, G: entry.G, B: entry.B, A: 255}
 		}
+	} else {
+		log.Printf("Полноцветное изображение: %d бит (RGB)", infoHeader.BiBitCount)
 	}
 
-	if _, err = file.Seek(int64(fileHeader.DataOffset), io.SeekStart); err != nil {
+	if _, err = file.Seek(int64(fileHeader.BfOffBits), io.SeekStart); err != nil {
 		return nil, err
 	}
 
-	width := int(infoHeader.Width)
-	absHeight := int(int32(math.Abs(float64(infoHeader.Height))))
+	width := int(infoHeader.BiWidth)
+	absHeight := int(int32(math.Abs(float64(infoHeader.BiHeight))))
 	img := image.NewRGBA(image.Rect(0, 0, width, absHeight))
 
-	bitsPerPixel := int(infoHeader.BitCount)
+	bitsPerPixel := int(infoHeader.BiBitCount)
 	bytesPerRow := ((width*bitsPerPixel + 31) / 32) * 4
 	buffer := make([]byte, bytesPerRow)
 
@@ -107,7 +112,7 @@ func loadBMP(filename string) (image.Image, error) {
 		}
 
 		destY := y
-		if infoHeader.Height > 0 {
+		if infoHeader.BiHeight > 0 {
 			destY = absHeight - 1 - y
 		}
 
@@ -161,7 +166,7 @@ func loadBMP(filename string) (image.Image, error) {
 			}
 
 		default:
-			return nil, fmt.Errorf("unsupported bit depth: %d", bitsPerPixel)
+			return nil, fmt.Errorf("неподдерживаемая глубина пикселей: %d", bitsPerPixel)
 		}
 	}
 
@@ -170,7 +175,7 @@ func loadBMP(filename string) (image.Image, error) {
 
 func run() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: bmpviewer <file.bmp>")
+		fmt.Println("Использование: bmpviewer <file.bmp>")
 		return
 	}
 
